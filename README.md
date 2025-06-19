@@ -1,4 +1,4 @@
-# iShare Task Management API
+# Task Management API Using Go / OAuth 2.0
 
 A secure, production-grade REST API built in Go that implements OAuth 2.0 authorization with JSON Web Signatures (JWS) for task management. This API follows industry best practices for authentication, authorization, and secure task management.
 
