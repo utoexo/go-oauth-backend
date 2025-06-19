@@ -1,0 +1,23 @@
+# Go binaries
+*.exe
+*.test
+*.out
+
+# Environment and secrets
+.env
+private_key.pem
+public_key.pem
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db 

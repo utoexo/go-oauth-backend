@@ -1,0 +1,448 @@
+{
+  "info": {
+    "_postman_id": "ishare-api-collection-001",
+    "name": "iShare Task Management API",
+    "description": "Professional, production-quality RESTful API for task management with OAuth2 and iSHARE compliance.\n\n## Getting Started\n1. Import this collection\n2. Set up environment variables\n3. Run the OAuth2 flow (Register -> Authorize -> Token)\n4. Use the Tasks endpoints\n\n## Environment Variables\n- base_url: API server URL (default: http://localhost:8080)\n- redirect_uri: OAuth callback URL (default: http://localhost:8081/callback)\n- client_id: Obtained after client registration\n- client_secret: Obtained after client registration\n- code: Obtained from authorization endpoint\n- access_token: Obtained from token endpoint\n- task_id: Used for task operations",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0"
+  },
+  "item": [
+    {
+      "name": "OAuth2",
+      "description": "OAuth 2.0 endpoints for client registration, authorization, and token exchange.",
+      "item": [
+        {
+          "name": "1. Register Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains client credentials\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.client_id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(jsonData.client_secret).to.be.a('string').and.not.empty;",
+                  "    ",
+                  "    // Save credentials to environment",
+                  "    pm.environment.set(\"client_id\", jsonData.client_id);",
+                  "    pm.environment.set(\"client_secret\", jsonData.client_secret);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_name\": \"Postman Client\",\n  \"redirect_uris\": [\"{{redirect_uri}}\"],\n  \"grant_types\": [\"authorization_code\"],\n  \"response_types\": [\"code\"],\n  \"token_endpoint_auth_method\": \"client_secret_basic\",\n  \"scope\": \"tasks\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/register",
+              "host": ["{{base_url}}"],
+              "path": ["register"]
+            },
+            "description": "Register a new OAuth client following iSHARE specifications.\n\nThis endpoint will return:\n- client_id\n- client_secret\n- Other client details\n\nThe credentials will be automatically saved to your environment variables."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Authorize (Get Code)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Verify client_id exists",
+                  "if (!pm.environment.get(\"client_id\")) {",
+                  "    throw new Error(\"client_id not found. Please run the Register Client request first.\");",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 302\", function () {",
+                  "    pm.response.to.have.status(302);",
+                  "});",
+                  "",
+                  "pm.test(\"Location header contains code\", function () {",
+                  "    var location = pm.response.headers.get(\"Location\");",
+                  "    var code = location.match(/code=([^&]+)/)[1];",
+                  "    pm.expect(code).to.be.a('string').and.not.empty;",
+                  "    ",
+                  "    // Save code to environment",
+                  "    pm.environment.set(\"code\", code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/authorize?client_id={{client_id}}&redirect_uri={{redirect_uri}}&response_type=code&state=xyz",
+              "host": ["{{base_url}}"],
+              "path": ["authorize"],
+              "query": [
+                { "key": "client_id", "value": "{{client_id}}" },
+                { "key": "redirect_uri", "value": "{{redirect_uri}}" },
+                { "key": "response_type", "value": "code" },
+                { "key": "state", "value": "xyz" }
+              ]
+            },
+            "description": "Initiates the OAuth2 Authorization Code Flow.\n\nThis endpoint will:\n1. Verify the client_id and redirect_uri\n2. Generate an authorization code\n3. Redirect with the code and state\n\nThe code will be automatically saved to your environment variables."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Token Exchange",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Verify required variables exist",
+                  "const required = ['client_id', 'client_secret', 'code'];",
+                  "required.forEach(function(variable) {",
+                  "    if (!pm.environment.get(variable)) {",
+                  "        throw new Error(`${variable} not found. Please run the previous requests first.`);",
+                  "    }",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains access token\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.access_token).to.be.a('string').and.not.empty;",
+                  "    pm.expect(jsonData.token_type).to.equal('Bearer');",
+                  "    pm.expect(jsonData.expires_in).to.be.a('number');",
+                  "    ",
+                  "    // Save access token to environment",
+                  "    pm.environment.set(\"access_token\", jsonData.access_token);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "authorization_code" },
+                { "key": "code", "value": "{{code}}" },
+                { "key": "redirect_uri", "value": "{{redirect_uri}}" },
+                { "key": "client_id", "value": "{{client_id}}" },
+                { "key": "client_secret", "value": "{{client_secret}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/token",
+              "host": ["{{base_url}}"],
+              "path": ["token"]
+            },
+            "description": "Exchanges an authorization code for a JWT access token.\n\nThis endpoint will:\n1. Verify the code, client credentials, and redirect_uri\n2. Generate a JWT access token\n3. Return the token with expiration time\n\nThe access token will be automatically saved to your environment variables."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "description": "Task management endpoints for CRUD operations.",
+      "item": [
+        {
+          "name": "List Tasks",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Verify access token exists",
+                  "if (!pm.environment.get(\"access_token\")) {",
+                  "    throw new Error(\"access_token not found. Please complete the OAuth2 flow first.\");",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array of tasks\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.expect(jsonData[0]).to.have.all.keys('id', 'title', 'description', 'status', 'created_at', 'updated_at');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["tasks"]
+            },
+            "description": "List all tasks.\n\nThis endpoint requires:\n- Valid JWT access token\n\nReturns an array of tasks with their details."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Task",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Verify access token exists",
+                  "if (!pm.environment.get(\"access_token\")) {",
+                  "    throw new Error(\"access_token not found. Please complete the OAuth2 flow first.\");",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains created task\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.all.keys('id', 'title', 'description', 'status', 'created_at', 'updated_at');",
+                  "    ",
+                  "    // Save task ID for other requests",
+                  "    pm.environment.set(\"task_id\", jsonData.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Task Title\",\n  \"description\": \"Task Description\",\n  \"status\": \"pending\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks",
+              "host": ["{{base_url}}"],
+              "path": ["tasks"]
+            },
+            "description": "Create a new task.\n\nThis endpoint requires:\n- Valid JWT access token\n- Task details in request body\n\nThe created task's ID will be automatically saved to your environment variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Task by ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Verify required variables exist",
+                  "const required = ['access_token', 'task_id'];",
+                  "required.forEach(function(variable) {",
+                  "    if (!pm.environment.get(variable)) {",
+                  "        throw new Error(`${variable} not found. Please run the previous requests first.`);",
+                  "    }",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains task details\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.all.keys('id', 'title', 'description', 'status', 'created_at', 'updated_at');",
+                  "    pm.expect(jsonData.id).to.equal(pm.environment.get(\"task_id\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}"]
+            },
+            "description": "Get a task by ID.\n\nThis endpoint requires:\n- Valid JWT access token\n- Task ID in the URL"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Task",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Verify required variables exist",
+                  "const required = ['access_token', 'task_id'];",
+                  "required.forEach(function(variable) {",
+                  "    if (!pm.environment.get(variable)) {",
+                  "        throw new Error(`${variable} not found. Please run the previous requests first.`);",
+                  "    }",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains updated task\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.all.keys('id', 'title', 'description', 'status', 'created_at', 'updated_at');",
+                  "    pm.expect(jsonData.id).to.equal(pm.environment.get(\"task_id\"));",
+                  "    pm.expect(jsonData.status).to.equal('completed');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Task Title\",\n  \"description\": \"Updated Task Description\",\n  \"status\": \"completed\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}"]
+            },
+            "description": "Update a task.\n\nThis endpoint requires:\n- Valid JWT access token\n- Task ID in the URL\n- Updated task details in request body"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Task",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Verify required variables exist",
+                  "const required = ['access_token', 'task_id'];",
+                  "required.forEach(function(variable) {",
+                  "    if (!pm.environment.get(variable)) {",
+                  "        throw new Error(`${variable} not found. Please run the previous requests first.`);",
+                  "    }",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 204\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});",
+                  "",
+                  "// Clear task_id from environment",
+                  "pm.environment.unset(\"task_id\");"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tasks", "{{task_id}}"]
+            },
+            "description": "Delete a task.\n\nThis endpoint requires:\n- Valid JWT access token\n- Task ID in the URL\n\nThe task_id will be automatically removed from your environment variables after successful deletion."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080", "description": "Base URL of the API server" },
+    { "key": "redirect_uri", "value": "http://localhost:8081/callback", "description": "OAuth callback URL" },
+    { "key": "client_id", "value": "", "description": "OAuth client ID" },
+    { "key": "client_secret", "value": "", "description": "OAuth client secret" },
+    { "key": "code", "value": "", "description": "OAuth authorization code" },
+    { "key": "access_token", "value": "", "description": "JWT access token" },
+    { "key": "task_id", "value": "", "description": "Task ID for operations" }
+  ]
+} 
